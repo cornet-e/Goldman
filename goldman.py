@@ -76,14 +76,21 @@ if uploaded_file:
         def circularity(c):
             area = cv2.contourArea(c)
             perimeter = cv2.arcLength(c, True)
-            if perimeter == 0:
-                return 0
-            return 4 * np.pi * area / (perimeter ** 2)
+            return 0 if perimeter == 0 else 4 * np.pi * area / (perimeter ** 2)
 
-        # Filtrer contours : taille minimale + circularité pour éliminer le texte
-        contours_filtered = [c for c in contours if cv2.contourArea(c) > 50 and circularity(c) > 0.2]
+        def aspect_ratio(c):
+            x, y, w, h = cv2.boundingRect(c)
+            return w / h
 
-        # Optionnel : filtrer contours trop loin du centre
+        # Filtrer contours : aire, circularité, aspect ratio pour éliminer le texte
+        contours_filtered = [
+            c for c in contours
+            if cv2.contourArea(c) > 150  # taille minimale
+            and circularity(c) > 0.2     # forme arrondie
+            and 0.2 < aspect_ratio(c) < 5  # élimine lettres trop fines ou larges
+        ]
+
+        # Filtrer contours trop loin du centre
         if scale:
             max_dist = 1.2 * 90 / scale
             contours_filtered = [
