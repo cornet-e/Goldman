@@ -2,6 +2,7 @@ import streamlit as st
 import cv2
 import numpy as np
 from streamlit_drawable_canvas import st_canvas
+from PIL import Image
 
 st.set_page_config(page_title="Goldmann – Analyse et Calibration", layout="wide")
 
@@ -26,12 +27,14 @@ if uploaded_file:
     Cela permet de convertir les pixels en degrés visuels.
     """)
 
-    # Canvas interactif
+    # Convertir np.array RGB en PIL
+    image_pil = Image.fromarray(image_rgb)
+
     canvas_result = st_canvas(
         fill_color="rgba(0, 0, 0, 0)",
         stroke_width=2,
         stroke_color="red",
-        background_image=image_rgb,  # np.array en RGB
+        background_image=image_pil,  # <-- PIL.Image ici
         update_streamlit=True,
         height=image.shape[0],
         width=image.shape[1],
