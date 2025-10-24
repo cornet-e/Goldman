@@ -7,3 +7,4 @@ seaborn
 matplotlib
 opencv-python-headless
 streamlit-drawable-canvas
+Pillow
