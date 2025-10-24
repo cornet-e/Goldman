@@ -31,7 +31,7 @@ if uploaded_file:
         fill_color="rgba(0, 0, 0, 0)",
         stroke_width=2,
         stroke_color="red",
-        background_image=st.Image(image_rgb),
+        background_image=image_rgb,  # np.array en RGB
         update_streamlit=True,
         height=image.shape[0],
         width=image.shape[1],
