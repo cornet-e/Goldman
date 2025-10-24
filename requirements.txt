@@ -5,3 +5,4 @@ plotly.express
 openpyxl
 seaborn
 matplotlib
+cv2
