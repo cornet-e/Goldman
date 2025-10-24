@@ -2,12 +2,15 @@ import streamlit as st
 import cv2
 import numpy as np
 from PIL import Image
-import plotly.graph_objects as go
+import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="Goldmann – Analyse Interactive", layout="wide")
 
 st.title("👁️ Interpréteur de champ visuel Goldmann")
-st.write("Cliquez sur le centre et le point 90° directement sur l'image pour calibrer l'échelle.")
+st.write("""
+Téléversez une image de champ visuel.  
+Choisissez le centre et un point sur le cercle 90° via sliders pour calibrer l'échelle, puis cliquez sur **Analyser**.
+""")
 
 # --- Upload image ---
 uploaded_file = st.file_uploader("Choisir une image (JPEG, PNG)", type=["jpg", "jpeg", "png"])
@@ -17,50 +20,40 @@ if uploaded_file:
     file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
     image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
     h, w, _ = image_rgb.shape
 
-    st.subheader("Image avec points de calibration")
+    st.subheader("Image originale")
+    st.image(image_rgb, use_column_width=True)
 
-    # --- Affichage avec Plotly ---
-    fig = go.Figure()
+    st.subheader("Calibration de l'échelle (degrés)")
 
-    fig.add_trace(go.Image(z=image_rgb))
+    col1, col2 = st.columns(2)
+    with col1:
+        center_x = st.slider("Centre X", 0, w-1, w//2)
+        center_y = st.slider("Centre Y", 0, h-1, h//2)
+    with col2:
+        point_x = st.slider("Point 90° X", 0, w-1, w//2)
+        point_y = st.slider("Point 90° Y", 0, h-1, h//2)
 
-    fig.update_layout(
-        width=w,
-        height=h,
-        margin=dict(l=0, r=0, t=0, b=0),
-    )
+    # --- Affichage des points sur l'image ---
+    fig, ax = plt.subplots()
+    ax.imshow(image_rgb)
+    ax.plot(center_x, center_y, 'ro', label="Centre")
+    ax.plot(point_x, point_y, 'go', label="Point 90°")
+    ax.legend()
+    ax.axis('off')
+    st.pyplot(fig)
 
-    # Capture clics
-    click_data = st.plotly_chart(fig, use_container_width=True)
-
-    st.write("Cliquez sur deux points pour calibrer (centre et 90°).")
-
-    if "clicks" not in st.session_state:
-        st.session_state.clicks = []
-
-    # On récupère les clics via Streamlit (nécessite le callback "plotly_events")
-    from streamlit_plotly_events import plotly_events
-    points = plotly_events(fig, click_event=True, key="plotly_clicks")
-
-    if points:
-        for p in points:
-            st.session_state.clicks.append((p["x"], p["y"]))
-    
-    if len(st.session_state.clicks) >= 2:
-        center_x, center_y = st.session_state.clicks[0]
-        point_x, point_y = st.session_state.clicks[1]
-
-        # --- Calcul de l'échelle ---
-        d_pixels = np.sqrt((point_x - center_x) ** 2 + (point_y - center_y) ** 2)
+    # --- Bouton pour lancer l'analyse ---
+    if st.button("Analyser"):
+        # Calcul de l'échelle
+        d_pixels = np.sqrt((point_x - center_x)**2 + (point_y - center_y)**2)
         if d_pixels > 0:
             scale = 90 / d_pixels
             st.success(f"Calibration : 1 pixel = {scale:.3f}°")
         else:
             scale = None
-            st.warning("Distance nulle, choisissez deux points différents.")
+            st.warning("Distance nulle, choisissez des points différents.")
 
         # --- Détection couleur (isoptères) ---
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -76,10 +69,7 @@ if uploaded_file:
                 return 0
             return 4 * np.pi * area / (perimeter ** 2)
 
-        contours_filtered = [
-            c for c in contours
-            if cv2.contourArea(c) > 100 and circularity(c) > 0.3
-        ]
+        contours_filtered = [c for c in contours if cv2.contourArea(c) > 100 and circularity(c) > 0.3]
 
         # --- Affichage des isoptères ---
         output = image.copy()
@@ -96,7 +86,7 @@ if uploaded_file:
                 if M["m00"] > 0:
                     cx = int(M["m10"] / M["m00"])
                     cy = int(M["m01"] / M["m00"])
-                    r_pix = np.sqrt((cx - center[0]) ** 2 + (cy - center[1]) ** 2)
+                    r_pix = np.sqrt((cx - center[0])**2 + (cy - center[1])**2)
                     radii_deg.append(r_pix * scale)
 
             mean_r = np.mean(radii_deg)
@@ -117,3 +107,5 @@ if uploaded_file:
             st.warning("Aucune isoptère détectée")
         else:
             st.info("Veuillez calibrer correctement les points")
+else:
+    st.info("➡️ Téléversez une image pour commencer")
