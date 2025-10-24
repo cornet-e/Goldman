@@ -55,12 +55,23 @@ if uploaded_file:
             scale = None
             st.warning("Distance nulle, choisissez des points différents.")
 
-        # --- Détection couleur (isoptères) ---
+        # --- Détection des isoptères par couleur ---
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        mask_color = cv2.inRange(hsv, (0, 60, 50), (180, 255, 255))
-        mask_color = cv2.medianBlur(mask_color, 5)
 
-        contours, _ = cv2.findContours(mask_color, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # Exemple pour l'isoptère rouge (adapter si nécessaire)
+        lower_red1 = np.array([0, 100, 100])
+        upper_red1 = np.array([10, 255, 255])
+        lower_red2 = np.array([160, 100, 100])
+        upper_red2 = np.array([180, 255, 255])
+        mask_red = cv2.inRange(hsv, lower_red1, upper_red1) | cv2.inRange(hsv, lower_red2, upper_red2)
+
+        # Dilater pour relier les lignes fines
+        kernel = np.ones((3,3), np.uint8)
+        mask_red = cv2.dilate(mask_red, kernel, iterations=1)
+        mask_red = cv2.medianBlur(mask_red, 3)
+
+        # --- Détection des contours ---
+        contours, _ = cv2.findContours(mask_red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         def circularity(c):
             area = cv2.contourArea(c)
@@ -69,11 +80,21 @@ if uploaded_file:
                 return 0
             return 4 * np.pi * area / (perimeter ** 2)
 
-        contours_filtered = [c for c in contours if cv2.contourArea(c) > 100 and circularity(c) > 0.3]
+        # Filtrer contours : taille minimale + circularité pour éliminer le texte
+        contours_filtered = [c for c in contours if cv2.contourArea(c) > 50 and circularity(c) > 0.2]
 
-        # --- Affichage des isoptères ---
+        # Optionnel : filtrer contours trop loin du centre
+        if scale:
+            max_dist = 1.2 * 90 / scale
+            contours_filtered = [
+                c for c in contours_filtered
+                if np.sqrt((cv2.moments(c)["m10"]/cv2.moments(c)["m00"] - center_x)**2 +
+                           (cv2.moments(c)["m01"]/cv2.moments(c)["m00"] - center_y)**2) < max_dist
+            ]
+
+        # --- Affichage contours détectés ---
         output = image.copy()
-        cv2.drawContours(output, contours_filtered, -1, (255, 0, 0), 2)
+        cv2.drawContours(output, contours_filtered, -1, (255,0,0), 2)
         st.subheader("Isoptères détectées")
         st.image(cv2.cvtColor(output, cv2.COLOR_BGR2RGB), use_column_width=True)
 
